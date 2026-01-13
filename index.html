@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+    <title>School Paint App V9 (White Background Fix)</title>
+    <style>
+        /* --- 1. CORE LAYOUT --- */
+        * { box-sizing: border-box; }
+        
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            overflow: hidden;
+            background-color: #bdc3c7; 
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* --- 2. SIDEBAR (Left) --- */
+        .sidebar {
+            width: 100px;
+            flex-shrink: 0;
+            background-color: #2c3e50;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            border-right: 1px solid #000;
+            padding: 10px 0;
+            overflow-y: auto;
+        }
+
+        .sidebar-title {
+            color: #bdc3c7;
+            font-size: 10px;
+            text-transform: uppercase;
+            margin: 10px 0 5px 0;
+            letter-spacing: 1px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .palette-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        .color-swatch {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid rgba(255,255,255,0.2);
+            transition: transform 0.1s;
+        }
+        .color-swatch:hover { transform: scale(1.1); border: 2px solid white; }
+        .color-swatch.active { border: 3px solid #00d2d3; transform: scale(1.15); }
+
+        .shade-container {
+            background-color: rgba(0,0,0,0.2);
+            padding: 10px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .shade-box {
+            width: 50px;
+            height: 35px;
+            border-radius: 4px;
+            cursor: pointer;
+            border: 2px solid rgba(255,255,255,0.1);
+        }
+        .shade-box:hover { border: 2px solid white; }
+        .shade-box.picked { border: 3px solid white; transform: scale(1.05); }
+
+        /* --- 3. MAIN AREA (Right) --- */
+        .main-content {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .toolbar {
+            height: 60px;
+            background-color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            padding: 0 10px;
+            border-bottom: 1px solid #999;
+            flex-shrink: 0;
+        }
+
+        .canvas-wrapper {
+            flex-grow: 1;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            position: relative;
+        }
+
+        canvas {
+            /* This is just visual CSS, not the actual pixels */
+            background-color: white; 
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            cursor: crosshair;
+            touch-action: none;
+            min-width: 200px; 
+            min-height: 200px;
+        }
+
+        button, .btn-label {
+            background-color: #4b7bec;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: bold;
+        }
+        button:hover, .btn-label:hover { background-color: #3867d6; }
+        
+        #clearBtn { background-color: #ff4757; }
+        #clearBtn:hover { background-color: #ff6b81; }
+        
+        input[type="file"] { display: none; }
+        .slider-group { display: flex; align-items: center; gap: 5px; font-size: 13px; }
+
+        /* --- 4. POPUP BOX (Modal) --- */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(0,0,0,0.6);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 999;
+        }
+        .modal-box {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            text-align: center;
+            width: 300px;
+        }
+        .modal-buttons {
+            display: flex; justify-content: space-around; margin-top: 20px;
+        }
+        .modal-btn-yes { background-color: #ff4757; }
+        .modal-btn-no { background-color: #2ed573; color: #fff; }
+
+    </style>
+</head>
+<body>
+
+    <div id="modalOverlay" class="modal-overlay">
+        <div class="modal-box">
+            <h3>Start Over?</h3>
+            <p>This will erase your drawing.</p>
+            <div class="modal-buttons">
+                <button class="modal-btn-yes" id="confirmYes">Yes, Erase</button>
+                <button class="modal-btn-no" id="confirmNo">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="sidebar">
+        <div class="sidebar-title">Color</div>
+        <div id="mainPalette" class="palette-grid"></div>
+        <div style="flex-grow: 1;"></div>
+        <div class="sidebar-title">Shades</div>
+        <div id="shadeContainer" class="shade-container"></div>
+    </div>
+
+    <div class="main-content">
+        <div class="toolbar">
+            <div class="slider-group">
+                <span>Size:</span>
+                <input type="range" id="brushSize" min="1" max="50" value="5">
+            </div>
+
+            <label for="imageLoader" class="btn-label">📷 Upload</label>
+            <input type="file" id="imageLoader" accept="image/*">
+
+            <button id="clearBtn">🗑️ Clear</button>
+            <button id="saveBtn">💾 Save</button>
+
+            <input type="color" id="colorPicker" value="#000000" style="position:absolute; visibility:hidden;">
+        </div>
+
+        <div class="canvas-wrapper" id="canvasWrapper">
+            <canvas id="drawingCanvas"></canvas>
+        </div>
+    </div>
+
+    <script>
+        window.addEventListener('load', () => {
+
+            const canvas = document.getElementById('drawingCanvas');
+            const ctx = canvas.getContext('2d');
+            const canvasWrapper = document.getElementById('canvasWrapper');
+            const colorPicker = document.getElementById('colorPicker');
+            const brushSize = document.getElementById('brushSize');
+            const mainPalette = document.getElementById('mainPalette');
+            const shadeContainer = document.getElementById('shadeContainer');
+            
+            // --- 1. NEW: FILL BACKGROUND FUNCTION ---
+            // This ensures the canvas has actual white pixels, not just transparency
+            function fillWhite() {
+                ctx.fillStyle = "#ffffff";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+
+            // --- 2. RESIZE LOGIC ---
+            function resize() {
+                const w = canvasWrapper.clientWidth || 800;
+                const h = canvasWrapper.clientHeight || 600;
+                
+                canvas.width = w;
+                canvas.height = h;
+                
+                // CRITICAL: Every time we resize, we must paint it white again
+                fillWhite();
+            }
+            resize(); 
+
+            // --- 3. COLORS & SHADES ---
+            const families = [
+                { name: 'Black',  shades: ['#000000', '#555555', '#AAAAAA'] }, 
+                { name: 'Red',    shades: ['#8B0000', '#FF0000', '#FFaaaa'] },
+                { name: 'Orange', shades: ['#CC5500', '#FFA500', '#FFCC66'] },
+                { name: 'Yellow', shades: ['#DAA520', '#FFFF00', '#FFFF99'] },
+                { name: 'Green',  shades: ['#006400', '#008000', '#90EE90'] },
+                { name: 'Blue',   shades: ['#00008B', '#0000FF', '#ADD8E6'] },
+                { name: 'Indigo', shades: ['#2F0057', '#4B0082', '#8A2BE2'] },
+                { name: 'Violet', shades: ['#800080', '#EE82EE', '#FFB6C1'] },
+                { name: 'White',  shades: ['#BBBBBB', '#EEEEEE', '#FFFFFF'] }
+            ];
+
+            families.forEach((family, index) => {
+                const dot = document.createElement('div');
+                dot.className = 'color-swatch';
+                dot.style.backgroundColor = family.shades[1];
+                
+                if(index === 0) {
+                    dot.classList.add('active');
+                    loadShades(family);
+                }
+
+                dot.addEventListener('click', () => {
+                    document.querySelectorAll('.color-swatch').forEach(d => d.classList.remove('active'));
+                    dot.classList.add('active');
+                    colorPicker.value = family.shades[1];
+                    loadShades(family);
+                });
+
+                mainPalette.appendChild(dot);
+            });
+
+            function loadShades(family) {
+                shadeContainer.innerHTML = '';
+                family.shades.forEach(shadeColor => {
+                    const box = document.createElement('div');
+                    box.className = 'shade-box';
+                    box.style.backgroundColor = shadeColor;
+                    
+                    if(shadeColor.toLowerCase() === colorPicker.value.toLowerCase()) {
+                        box.classList.add('picked');
+                    }
+
+                    box.addEventListener('click', () => {
+                        colorPicker.value = shadeColor;
+                        document.querySelectorAll('.shade-box').forEach(b => b.classList.remove('picked'));
+                        box.classList.add('picked');
+                    });
+                    
+                    shadeContainer.appendChild(box);
+                });
+            }
+
+            // --- 4. DRAWING ---
+            let isDrawing = false;
+            function getPos(e) {
+                const rect = canvas.getBoundingClientRect();
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                return { x: clientX - rect.left, y: clientY - rect.top };
+            }
+
+            function start(e) {
+                isDrawing = true;
+                const pos = getPos(e);
+                ctx.beginPath();
+                ctx.moveTo(pos.x, pos.y);
+                draw(e);
+            }
+
+            function stop() {
+                isDrawing = false;
+                ctx.beginPath();
+            }
+
+            function draw(e) {
+                if (!isDrawing) return;
+                const pos = getPos(e);
+
+                ctx.lineWidth = brushSize.value;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.strokeStyle = colorPicker.value;
+
+                ctx.lineTo(pos.x, pos.y);
+                ctx.stroke();
+                
+                ctx.beginPath();
+                ctx.moveTo(pos.x, pos.y);
+            }
+
+            // Listeners
+            canvas.addEventListener('mousedown', start);
+            canvas.addEventListener('mousemove', draw);
+            canvas.addEventListener('mouseup', stop);
+            canvas.addEventListener('mouseleave', stop);
+            canvas.addEventListener('touchstart', (e) => { e.preventDefault(); start(e); }, { passive: false });
+            canvas.addEventListener('touchmove', (e) => { e.preventDefault(); draw(e); }, { passive: false });
+            canvas.addEventListener('touchend', stop);
+
+            // --- 5. BUTTONS ---
+            const modal = document.getElementById('modalOverlay');
+            document.getElementById('clearBtn').addEventListener('click', () => modal.style.display = 'flex');
+            document.getElementById('confirmNo').addEventListener('click', () => modal.style.display = 'none');
+            
+            document.getElementById('confirmYes').addEventListener('click', () => {
+                // FIXED: Instead of clearRect, we use fillWhite
+                fillWhite(); 
+                modal.style.display = 'none';
+            });
+
+            document.getElementById('saveBtn').addEventListener('click', () => {
+                const link = document.createElement('a');
+                link.download = 'school-art.png';
+                link.href = canvas.toDataURL(); // This now includes the white background
+                link.click();
+            });
+
+            const imageLoader = document.getElementById('imageLoader');
+            imageLoader.addEventListener('change', (e) => {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const img = new Image();
+                    img.onload = function() {
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    }
+                    img.src = event.target.result;
+                }
+                if(e.target.files[0]) reader.readAsDataURL(e.target.files[0]);
+            });
+
+        });
+    </script>
+</body>
+</html>
